@@ -1,24 +1,16 @@
 package main
 
 import (
-	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"net/http"
 	"os"
-	"time"
+	router "vehicle/router"
+	service "vehicle/service"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var client *mongo.Client
-
-var jwtKey []byte
+var JwtKey []byte
 
 func init() {
 	// 加载 .env 文件
@@ -27,86 +19,39 @@ func init() {
 		panic("Error loading .env file")
 	}
 
-	jwtKey = []byte(os.Getenv("JWT_SECRET_KEY"))
-}
-
-type User struct {
-	Username  string    `json:"username" binding:"required"`
-	Password  string    `json:"password" binding:"required"`
-	Email     string    `json:"email" binding:"required,email"`
-	Role      string    `json:"role"`
-	CreatedAt time.Time `json:"created_at"`
+	JwtKey = []byte(os.Getenv("JWT_SECRET_KEY"))
 }
 
 func main() {
-	r := gin.Default()
-	clientOption := options.Client().ApplyURI("mongodb://localhost:27017")
-	client, _ = mongo.Connect(context.TODO(), clientOption)
-	defer client.Disconnect(context.TODO())
+	service.Setjwtkey(JwtKey)
 
-	r.POST("/login", loginUser)
-	r.POST("/register", registerUser)
-	r.Run(":4000")
+	// defer client.Disconnect(context.TODO())
+
+	app := setupRouter()
+	app.Run(":4000")
 }
 
-type LoginRequest struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
+func setupRouter() *gin.Engine {
+	app := gin.Default()
+	// app.Use(timeoutMiddleware(5 * time.Second))
+	app.Use(corsMiddleware())
+	api := app.Group("api")
+
+	router.AddUserRoute(api)
+	router.AppointmentRoute(api)
+	// app.GET("swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	return app
 }
 
-func loginUser(c *gin.Context) {
-	var loginRequest LoginRequest
-	if err := c.ShouldBindJSON(&loginRequest); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+func corsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, userToken")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusOK)
+			return
+		}
+		c.Next()
 	}
-
-	var user User
-	collection := client.Database("car-repair-system").Collection("users")
-	err := collection.FindOne(context.TODO(), bson.M{"username": loginRequest.Username}).Decode(&user)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
-		return
-	}
-
-	// Compare passwords
-	hash := sha256.New()
-	hash.Write([]byte(loginRequest.Password))
-	if user.Password != hex.EncodeToString(hash.Sum(nil)) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
-		return
-	}
-
-	// Create JWT token
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"username": user.Username,
-		"role":     user.Role,
-		"exp":      time.Now().Add(time.Hour * 24).Unix(),
-	})
-	tokenString, _ := token.SignedString(jwtKey)
-
-	c.JSON(http.StatusOK, gin.H{"token": tokenString})
-}
-
-func registerUser(c *gin.Context) {
-	var user User
-	if err := c.ShouldBindJSON(&user); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Hash the password
-	hash := sha256.New()
-	hash.Write([]byte(user.Password))
-	user.Password = hex.EncodeToString(hash.Sum(nil))
-	user.CreatedAt = time.Now()
-
-	collection := client.Database("car-repair-system").Collection("users")
-	_, err := collection.InsertOne(context.TODO(), user)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register user"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "User registered successfully"})
 }
