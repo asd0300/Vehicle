@@ -50,7 +50,6 @@ func LoginUser(c *gin.Context) {
 		"exp":      time.Now().Add(time.Hour * 24).Unix(),
 	})
 	tokenString, _ := token.SignedString(jwtKey)
-
 	c.JSON(http.StatusOK, gin.H{"token": tokenString,
 		"user_id": user.ID.Hex()})
 }
