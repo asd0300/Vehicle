@@ -17,4 +17,5 @@ type Appointment struct {
 	DropoffAddress  string             `bson:"dropoffaddress" json:"dropoff_address"`
 	Status          string             `bson:"status" json:"status"`
 	CreatedAt       time.Time          `bson:"createdat" json:"created_at"`
+	UserName        string             `bson:"username" json:"user_name"`
 }

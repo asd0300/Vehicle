@@ -4,14 +4,18 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
+	"log"
 	"net/http"
 	"time"
-	mongo "vehicle/database"
+	mongost "vehicle/database"
 	model "vehicle/model"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var jwtKey []byte
@@ -28,8 +32,7 @@ func LoginUser(c *gin.Context) {
 	}
 
 	var user model.User
-	collection := mongo.Client.Database("car-repair-system").Collection("users")
-	err := collection.FindOne(context.TODO(), bson.M{"username": loginRequest.Username}).Decode(&user)
+	err := mongost.UserCollection.FindOne(context.TODO(), bson.M{"username": loginRequest.Username}).Decode(&user)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
 		return
@@ -66,13 +69,37 @@ func RegisterUser(c *gin.Context) {
 	hash.Write([]byte(user.Password))
 	user.Password = hex.EncodeToString(hash.Sum(nil))
 	user.CreatedAt = time.Now()
+	user.Role = "client"
 
-	collection := mongo.Client.Database("car-repair-system").Collection("users")
-	_, err := collection.InsertOne(context.TODO(), user)
+	if mongost.Client == nil {
+		log.Fatal("MongoDB client is not initialized")
+	}
+
+	_, err := mongost.UserCollection.InsertOne(context.TODO(), user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register user"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "User registered successfully"})
+}
+
+func GetUserByID(userID string) (*model.User, error) {
+	objectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return nil, fmt.Errorf("Invalid user ID")
+	}
+
+	filter := bson.M{"_id": objectID}
+
+	var user model.User
+	err = mongost.UserCollection.FindOne(context.Background(), filter).Decode(&user)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, fmt.Errorf("User not found")
+		}
+		return nil, fmt.Errorf("Failed to fetch user: %v", err)
+	}
+
+	return &user, nil
 }

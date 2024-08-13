@@ -2,28 +2,24 @@ package main
 
 import (
 	"net/http"
-	"os"
+	database "vehicle/database"
+	enviroment "vehicle/enviroment"
 	router "vehicle/router"
 	service "vehicle/service"
 
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 )
 
-var JwtKey []byte
-
 func init() {
-	// 加载 .env 文件
-	err := godotenv.Load()
-	if err != nil {
-		panic("Error loading .env file")
-	}
+	enviroment.SetEnv()
 
-	JwtKey = []byte(os.Getenv("JWT_SECRET_KEY"))
 }
 
 func main() {
-	service.Setjwtkey(JwtKey)
+	//初始化 mongo
+	database.CreateMongoConnect()
+
+	service.Setjwtkey(enviroment.JwtKey)
 
 	// defer client.Disconnect(context.TODO())
 
