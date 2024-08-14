@@ -13,6 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+// 獲取全部appointments
 func GetAllAppointment(c *gin.Context) {
 	userID := c.GetHeader("Authorization")
 
@@ -49,6 +50,7 @@ func GetAllAppointment(c *gin.Context) {
 	c.JSON(200, appointments)
 }
 
+// 新增appointment
 func CreateNewAppointment(c *gin.Context) {
 	userID := c.GetHeader("Authorization")
 
@@ -81,12 +83,14 @@ func CreateNewAppointment(c *gin.Context) {
 	}
 
 	user, err := GetUserByID(userID)
-
-	smtpHelper.SendReservationEmail(appointment, *user)
+	if err != nil {
+		smtpHelper.SendReservationEmail(appointment, *user)
+	}
 
 	c.JSON(201, appointment)
 }
 
+// 以appointment ID 搜尋 detail
 func GetDetailAppointmentById(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := primitive.ObjectIDFromHex(idParam)
@@ -105,6 +109,7 @@ func GetDetailAppointmentById(c *gin.Context) {
 	c.JSON(200, appointment)
 }
 
+// 以appointment ID 更新 detail
 func UpdateDetailAppointmentById(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := primitive.ObjectIDFromHex(idParam)
@@ -128,6 +133,7 @@ func UpdateDetailAppointmentById(c *gin.Context) {
 			"pickupaddress":   appointment.PickupAddress,
 			"dropoffaddress":  appointment.DropoffAddress,
 			"status":          appointment.Status,
+			"comments":        appointment.Comments,
 		},
 	}
 
@@ -140,6 +146,7 @@ func UpdateDetailAppointmentById(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "Appointment updated"})
 }
 
+// 刪除指定appointId的資料
 func DeleteDetailAppointmentById(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := primitive.ObjectIDFromHex(idParam)
@@ -241,4 +248,41 @@ func GetBookedSlots(c *gin.Context) {
 	}
 
 	c.JSON(200, bookedSlots)
+}
+
+func GetAvailableSlots(c *gin.Context) {
+	date := c.Query("date")
+
+	// 統計某日上下午
+	morningFilter := bson.M{"appointment_date": date, "timeslot": "morning"}
+	afternoonFilter := bson.M{"appointment_date": date, "timeslot": "afternoon"}
+
+	morningCount, err := mongo.AppointmentCollection.CountDocuments(context.Background(), morningFilter)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to count morning appointments"})
+		return
+	}
+
+	afternoonCount, err := mongo.AppointmentCollection.CountDocuments(context.Background(), afternoonFilter)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to count afternoon appointments"})
+		return
+	}
+
+	// 查询 owner 设置的最大预约数
+	var capacity model.TimeSlotCapacity
+	capacityFilter := bson.M{"date": date}
+	err = mongo.CapacityCollection.FindOne(context.Background(), capacityFilter).Decode(&capacity)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to fetch time slot capacity"})
+		return
+	}
+
+	// 計算剩餘
+	availableSlots := map[string]int{
+		"morning":   capacity.Morning - int(morningCount),
+		"afternoon": capacity.Afternoon - int(afternoonCount),
+	}
+
+	c.JSON(200, availableSlots)
 }

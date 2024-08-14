@@ -15,13 +15,15 @@ func AppointmentRoute(r *gin.RouterGroup) {
 		book.POST("/appointments", service.CreateNewAppointment)
 		book.GET("/appointments", service.GetAllAppointment)
 		book.GET("/appointments/:id", service.GetDetailAppointmentById)
-		book.PUT("/appointments/:id", service.UpdateDetailAppointmentById)
+
 		book.DELETE("/appointments/:id", service.DeleteDetailAppointmentById)
 		book.GET("/appointments/slot", service.GetBookedSlots)
 	}
 	protected := r.Group("/book")
 	protected.Use(middleware.AuthMiddleware())
 	protected.GET("/appointments/client", OwnerAppointmentsHandler, service.GetClientAppointments)
+	protected.GET("/getAvailableSlots", service.GetAvailableSlots)
+	protected.PUT("/appointments/:id", OwnerAppointmentsHandler, service.UpdateDetailAppointmentById)
 }
 
 func OwnerAppointmentsHandler(c *gin.Context) {

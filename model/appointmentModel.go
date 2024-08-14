@@ -16,6 +16,14 @@ type Appointment struct {
 	PickupAddress   string             `bson:"pickupaddress" json:"pickup_address"`
 	DropoffAddress  string             `bson:"dropoffaddress" json:"dropoff_address"`
 	Status          string             `bson:"status" json:"status"`
+	TimeSlot        string             `bson:"timeslot" json:"time_slot"`
 	CreatedAt       time.Time          `bson:"createdat" json:"created_at"`
 	UserName        string             `bson:"username" json:"user_name"`
+	Comments        []Comment          `bson:"comments" json:"comments"`
+}
+
+type Comment struct {
+	Author  string    `bson:"author" json:"author"`
+	Text    string    `bson:"text" json:"text"`
+	Created time.Time `bson:"created" json:"created"`
 }

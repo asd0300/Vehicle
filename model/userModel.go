@@ -17,5 +17,6 @@ type User struct {
 	Password  string             `json:"password" binding:"required"`
 	Email     string             `json:"email" binding:"required,email"`
 	Role      string             `json:"role"`
+	Capacity  []TimeSlotCapacity `bson:"capacity,omitempty" json:"capacity"`
 	CreatedAt time.Time          `json:"created_at"`
 }

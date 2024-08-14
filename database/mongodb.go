@@ -10,6 +10,7 @@ import (
 var Client *mongo.Client
 var AppointmentCollection *mongo.Collection
 var UserCollection *mongo.Collection
+var CapacityCollection *mongo.Collection
 
 // func init() {
 // 	CreateMongoConnect()
@@ -20,4 +21,5 @@ func CreateMongoConnect() {
 	Client, _ = mongo.Connect(context.TODO(), clientOption)
 	AppointmentCollection = Client.Database("car-repair-system").Collection("appointments")
 	UserCollection = Client.Database("car-repair-system").Collection("users")
+	CapacityCollection = Client.Database("car-repair-system").Collection("capacity")
 }

@@ -32,9 +32,11 @@ func setupRouter() *gin.Engine {
 	// app.Use(timeoutMiddleware(5 * time.Second))
 	app.Use(corsMiddleware())
 	api := app.Group("api")
-
-	router.AddUserRoute(api)
-	router.AppointmentRoute(api)
+	{
+		router.AddUserRoute(api)
+		router.AppointmentRoute(api)
+		router.AddCapacityRoute(api)
+	}
 	// app.GET("swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	return app
 }
@@ -44,6 +46,7 @@ func corsMiddleware() gin.HandlerFunc {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, userToken")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusOK)
 			return
