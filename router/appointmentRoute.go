@@ -24,6 +24,12 @@ func AppointmentRoute(r *gin.RouterGroup) {
 	protected.GET("/appointments/client", OwnerAppointmentsHandler, service.GetClientAppointments)
 	protected.GET("/getAvailableSlots", service.GetAvailableSlots)
 	protected.PUT("/appointments/:id", OwnerAppointmentsHandler, service.UpdateDetailAppointmentById)
+
+	calendar := r.Group("/calendar")
+	calendar.Use(middleware.AuthMiddleware())
+	calendar.GET("", service.GetAppointmentResStatus)
+	calendar.POST("save-limits", OwnerAppointmentsHandler, service.SettingSaveLimits)
+
 }
 
 func OwnerAppointmentsHandler(c *gin.Context) {

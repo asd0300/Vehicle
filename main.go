@@ -1,18 +1,49 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
+	"os"
+	"time"
 	database "vehicle/database"
 	enviroment "vehicle/enviroment"
 	router "vehicle/router"
 	service "vehicle/service"
 
 	"github.com/gin-gonic/gin"
+	log "github.com/sirupsen/logrus"
 )
 
 func init() {
 	enviroment.SetEnv()
+	LogSetting()
+}
 
+func LogSetting() {
+	currentDate := time.Now().Format("2006-01-02")
+
+	logDir := "logs"
+	logFileName := fmt.Sprintf("%s/%s.log", logDir, currentDate)
+
+	if _, err := os.Stat(logDir); os.IsNotExist(err) {
+		err = os.Mkdir(logDir, 0755)
+		if err != nil {
+			log.Fatalf("Could not create log directory: %v", err)
+		}
+	}
+
+	file, err := os.OpenFile(logFileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("Failed to log to file, using default stderr: %v", err)
+	}
+
+	log.SetOutput(file)
+
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp: true,
+	})
+
+	log.SetLevel(log.InfoLevel)
 }
 
 func main() {

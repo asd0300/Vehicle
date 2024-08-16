@@ -16,7 +16,7 @@ func SendReservationEmail(appointment model.Appointment, user model.User) {
 
 	// email content
 	subject := "Appointment Confirmation"
-	body := fmt.Sprintf("Dear %s,\n\nYour appointment for %s on %s has been confirmed.\n\nThank you!", user.Username, appointment.ServiceType, appointment.AppointmentDate)
+	body := fmt.Sprintf("Dear %s,\n\nYour appointment for %s on %s has been confirmed.\n\nBrand: %s\tModel: %s\t ServiceType: %s Appointment Date: %s\n\nThank you!", user.Username, appointment.ServiceType, appointment.AppointmentDate, appointment.VehicleBrand, appointment.VehicleModel, appointment.ServiceType, appointment.AppointmentDate)
 	message := fmt.Sprintf("From: %s\nTo: %s\nSubject: %s\n\n%s", from, to, subject, body)
 
 	// SMTP auth

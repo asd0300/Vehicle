@@ -2,15 +2,20 @@ package service
 
 import (
 	"context"
+	"net/http"
 	"strings"
 	"time"
-	mongo "vehicle/database"
+	mongovehicle "vehicle/database"
 	model "vehicle/model"
 	smtpHelper "vehicle/smtp"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // 獲取全部appointments
@@ -31,7 +36,7 @@ func GetAllAppointment(c *gin.Context) {
 
 	var appointments []model.Appointment
 	filter := bson.M{"user_id": objID}
-	cursor, err := mongo.AppointmentCollection.Find(context.Background(), filter)
+	cursor, err := mongovehicle.AppointmentCollection.Find(context.Background(), filter)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Failed to fetch appointments"})
 		return
@@ -72,18 +77,82 @@ func CreateNewAppointment(c *gin.Context) {
 		return
 	}
 
-	appointment.ID = primitive.NewObjectID()
-	appointment.CreatedAt = time.Now()
-	appointment.UserID = objID
+	// appointment.ID = primitive.NewObjectID()
+	// appointment.CreatedAt = time.Now()
+	// appointment.UserID = objID
 
-	_, err = mongo.AppointmentCollection.InsertOne(context.Background(), appointment)
+	// _, err = mongovehicle.AppointmentCollection.InsertOne(context.Background(), appointment)
+	// if err != nil {
+	// 	c.JSON(500, gin.H{"error": "Failed to create appointment"})
+	// 	return
+	// }
+
+	// Start a session for transaction
+	session, err := mongovehicle.Client.StartSession()
 	if err != nil {
-		c.JSON(500, gin.H{"error": "Failed to create appointment"})
+		c.JSON(500, gin.H{"error": "Failed to start session"})
+		return
+	}
+	defer session.EndSession(context.Background())
+
+	// Create a transaction
+	err = session.StartTransaction()
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to start transaction"})
 		return
 	}
 
+	// Transaction block
+	err = mongo.WithSession(context.Background(), session, func(sc mongo.SessionContext) error {
+		// 1. 查找并更新相应日期的 Reserved 数量
+		filter := bson.M{"day": appointment.AppointmentDate, "resdue_appointment": bson.M{"$gt": 0}}
+		update := bson.M{
+			"$inc": bson.M{"reserved": 1, "resdue_appointment": -1},
+		}
+		options := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+		var updatedCalendar model.CalendarData
+		err = mongovehicle.CalendarCollection.FindOneAndUpdate(sc, filter, update, options).Decode(&updatedCalendar)
+		if err != nil {
+			session.AbortTransaction(sc)
+			if err == mongo.ErrNoDocuments {
+				c.JSON(400, gin.H{"error": "No available appointment slots on the selected date"})
+			} else {
+				c.JSON(500, gin.H{"error": "Failed to update calendar"})
+			}
+			return err
+		}
+
+		// 2. 创建新的预约
+		appointment.ID = primitive.NewObjectID()
+		appointment.CreatedAt = time.Now()
+		appointment.UserID = objID
+
+		_, err = mongovehicle.AppointmentCollection.InsertOne(sc, appointment)
+		if err != nil {
+			session.AbortTransaction(sc)
+			c.JSON(500, gin.H{"error": "Failed to create appointment"})
+			return err
+		}
+
+		// 3. 提交事务
+		if err = session.CommitTransaction(sc); err != nil {
+			c.JSON(500, gin.H{"error": "Failed to commit transaction"})
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return
+	}
+
+	//寄信通知獲得使用者資訊
 	user, err := GetUserByID(userID)
 	if err != nil {
+		log.Errorf("Error getting user by ID: %v, fail to Send Mail", err)
+	} else {
 		smtpHelper.SendReservationEmail(appointment, *user)
 	}
 
@@ -100,7 +169,7 @@ func GetDetailAppointmentById(c *gin.Context) {
 	}
 
 	var appointment model.Appointment
-	err = mongo.AppointmentCollection.FindOne(context.Background(), bson.M{"_id": id}).Decode(&appointment)
+	err = mongovehicle.AppointmentCollection.FindOne(context.Background(), bson.M{"_id": id}).Decode(&appointment)
 	if err != nil {
 		c.JSON(404, gin.H{"error": "Appointment not found"})
 		return
@@ -137,7 +206,7 @@ func UpdateDetailAppointmentById(c *gin.Context) {
 		},
 	}
 
-	_, err = mongo.AppointmentCollection.UpdateOne(context.Background(), bson.M{"_id": id}, update)
+	_, err = mongovehicle.AppointmentCollection.UpdateOne(context.Background(), bson.M{"_id": id}, update)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Failed to update appointment"})
 		return
@@ -155,7 +224,7 @@ func DeleteDetailAppointmentById(c *gin.Context) {
 		return
 	}
 
-	_, err = mongo.AppointmentCollection.DeleteOne(context.Background(), bson.M{"_id": id})
+	_, err = mongovehicle.AppointmentCollection.DeleteOne(context.Background(), bson.M{"_id": id})
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Failed to delete appointment"})
 		return
@@ -170,7 +239,7 @@ func GetClientAppointments(c *gin.Context) {
 	// 首先，找到所有角色为 "client" 的用户
 	var users []model.User
 	filter := bson.M{"role": "client"} // Filter appointments by client role
-	cursor, err := mongo.UserCollection.Find(context.Background(), filter)
+	cursor, err := mongovehicle.UserCollection.Find(context.Background(), filter)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Failed to fetch users"})
 		return
@@ -188,7 +257,7 @@ func GetClientAppointments(c *gin.Context) {
 
 	//使用userIDs fileter appointment
 	appointmentFilter := bson.M{"user_id": bson.M{"$in": userIDs}}
-	appointmentCursor, err := mongo.AppointmentCollection.Find(context.Background(), appointmentFilter)
+	appointmentCursor, err := mongovehicle.AppointmentCollection.Find(context.Background(), appointmentFilter)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Failed to fetch appointments"})
 		return
@@ -226,7 +295,7 @@ func GetBookedSlots(c *gin.Context) {
 	}
 
 	// 查找在指定日期范围内的所有预约
-	cursor, err := mongo.AppointmentCollection.Find(context.Background(), filter)
+	cursor, err := mongovehicle.AppointmentCollection.Find(context.Background(), filter)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Failed to fetch appointments"})
 		return
@@ -257,13 +326,13 @@ func GetAvailableSlots(c *gin.Context) {
 	morningFilter := bson.M{"appointment_date": date, "timeslot": "morning"}
 	afternoonFilter := bson.M{"appointment_date": date, "timeslot": "afternoon"}
 
-	morningCount, err := mongo.AppointmentCollection.CountDocuments(context.Background(), morningFilter)
+	morningCount, err := mongovehicle.AppointmentCollection.CountDocuments(context.Background(), morningFilter)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Failed to count morning appointments"})
 		return
 	}
 
-	afternoonCount, err := mongo.AppointmentCollection.CountDocuments(context.Background(), afternoonFilter)
+	afternoonCount, err := mongovehicle.AppointmentCollection.CountDocuments(context.Background(), afternoonFilter)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Failed to count afternoon appointments"})
 		return
@@ -272,7 +341,7 @@ func GetAvailableSlots(c *gin.Context) {
 	// 查询 owner 设置的最大预约数
 	var capacity model.TimeSlotCapacity
 	capacityFilter := bson.M{"date": date}
-	err = mongo.CapacityCollection.FindOne(context.Background(), capacityFilter).Decode(&capacity)
+	err = mongovehicle.CapacityCollection.FindOne(context.Background(), capacityFilter).Decode(&capacity)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Failed to fetch time slot capacity"})
 		return
@@ -285,4 +354,57 @@ func GetAvailableSlots(c *gin.Context) {
 	}
 
 	c.JSON(200, availableSlots)
+}
+
+// 獲取可使用預約
+func GetAppointmentResStatus(c *gin.Context) {
+	var calendarData []model.CalendarData
+	cursor, err := mongovehicle.CalendarCollection.Find(context.Background(), bson.D{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch data"})
+		return
+	}
+	defer cursor.Close(context.Background())
+
+	for cursor.Next(context.Background()) {
+		var data model.CalendarData
+		err := cursor.Decode(&data)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode data"})
+			return
+		}
+		calendarData = append(calendarData, data)
+	}
+
+	if err := cursor.Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Cursor error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, calendarData)
+}
+
+// owner 儲存 calendar limit
+func SettingSaveLimits(c *gin.Context) {
+	var rawLimits []model.CalendarData
+	if err := c.BindJSON(&rawLimits); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		return
+	}
+	for _, limit := range rawLimits {
+		filter := bson.M{"day": limit.Day}
+		update := bson.M{
+			"$set": bson.M{
+				"limit_appointment":  limit.LimitAppointment,
+				"resdue_appointment": limit.ResdueAppointment,
+			},
+		}
+		_, err := mongovehicle.CalendarCollection.UpdateOne(context.Background(), filter, update, options.Update().SetUpsert(true))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save limits"})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "Limits saved successfully"})
 }

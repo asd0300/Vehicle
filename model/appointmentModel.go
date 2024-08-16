@@ -27,3 +27,10 @@ type Comment struct {
 	Text    string    `bson:"text" json:"text"`
 	Created time.Time `bson:"created" json:"created"`
 }
+
+type CalendarData struct {
+	Day               string `json:"day" bson:"day"`
+	LimitAppointment  int    `json:"limit_appointment" bson:"limit_appointment"`
+	Reserved          int    `json:"reserved" bson:"reserved"`
+	ResdueAppointment int    `json:"resdue_appointment" bson:"resdue_appointment"`
+}

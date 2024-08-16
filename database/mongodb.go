@@ -11,6 +11,7 @@ var Client *mongo.Client
 var AppointmentCollection *mongo.Collection
 var UserCollection *mongo.Collection
 var CapacityCollection *mongo.Collection
+var CalendarCollection *mongo.Collection
 
 // func init() {
 // 	CreateMongoConnect()
@@ -22,4 +23,5 @@ func CreateMongoConnect() {
 	AppointmentCollection = Client.Database("car-repair-system").Collection("appointments")
 	UserCollection = Client.Database("car-repair-system").Collection("users")
 	CapacityCollection = Client.Database("car-repair-system").Collection("capacity")
+	CalendarCollection = Client.Database("car-repair-system").Collection("calendar")
 }
