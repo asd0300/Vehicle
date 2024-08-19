@@ -7,6 +7,7 @@ import (
 	"time"
 	database "vehicle/database"
 	enviroment "vehicle/enviroment"
+	"vehicle/kafkahelper"
 	router "vehicle/router"
 	service "vehicle/service"
 
@@ -17,6 +18,7 @@ import (
 func init() {
 	enviroment.SetEnv()
 	LogSetting()
+	go kafkahelper.StartKafkaEmailConsumer()
 }
 
 func LogSetting() {

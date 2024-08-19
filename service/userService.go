@@ -50,7 +50,7 @@ func LoginUser(c *gin.Context) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"username": user.Username,
 		"role":     user.Role,
-		"exp":      time.Now().Add(time.Hour * 24).Unix(),
+		"exp":      time.Now().Add(time.Hour * 2).Unix(),
 	})
 	tokenString, _ := token.SignedString(jwtKey)
 	c.JSON(http.StatusOK, gin.H{"token": tokenString,

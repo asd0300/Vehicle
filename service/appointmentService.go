@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 	mongovehicle "vehicle/database"
+	"vehicle/kafkahelper"
 	model "vehicle/model"
 	smtpHelper "vehicle/smtp"
 
@@ -152,6 +153,15 @@ func CreateNewAppointment(c *gin.Context) {
 	user, err := GetUserByID(userID)
 	if err != nil {
 		log.Errorf("Error getting user by ID: %v, fail to Send Mail", err)
+	}
+
+	//是否使用kfaka
+	if kafkahelper.IsKafkaOn() {
+		err := kafkahelper.SendReservationEmailKafkaProducer(appointment, *user)
+		if err != nil {
+			log.Warnf("Failed to send email via Kafka: %v, fallback to direct email sending", err)
+			smtpHelper.SendReservationEmail(appointment, *user)
+		}
 	} else {
 		smtpHelper.SendReservationEmail(appointment, *user)
 	}
@@ -224,9 +234,31 @@ func DeleteDetailAppointmentById(c *gin.Context) {
 		return
 	}
 
+	var appointment model.Appointment
+	err = mongovehicle.AppointmentCollection.FindOne(context.Background(), bson.M{"_id": id}).Decode(&appointment)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to find appointment"})
+		return
+	}
+
 	_, err = mongovehicle.AppointmentCollection.DeleteOne(context.Background(), bson.M{"_id": id})
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Failed to delete appointment"})
+		return
+	}
+
+	// 更新 CalendarData，原子增加 ResdueAppointment 和减少 Reserved
+	filter := bson.M{"day": appointment.AppointmentDate}
+	update := bson.M{
+		"$inc": bson.M{
+			"reserved":           -1,
+			"resdue_appointment": 1,
+		},
+	}
+
+	result := mongovehicle.CalendarCollection.FindOneAndUpdate(context.Background(), filter, update)
+	if result.Err() != nil {
+		c.JSON(500, gin.H{"error": "Failed to update calendar data"})
 		return
 	}
 

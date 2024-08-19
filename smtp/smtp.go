@@ -5,6 +5,8 @@ import (
 	"net/smtp"
 	"vehicle/enviroment"
 	"vehicle/model"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func SendReservationEmail(appointment model.Appointment, user model.User) {
@@ -25,8 +27,8 @@ func SendReservationEmail(appointment model.Appointment, user model.User) {
 	// send
 	err := smtp.SendMail(smtpHost+":"+smtpPort, auth, from, []string{to}, []byte(message))
 	if err != nil {
-		fmt.Println("Failed to send email:", err)
+		log.Warnf("Failed to send email: %v", err)
 	} else {
-		fmt.Println("Email sent successfully to", to)
+		log.Infof("Email sent successfully to %v", to)
 	}
 }
