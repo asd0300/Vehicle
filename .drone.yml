@@ -1,0 +1,23 @@
+kind: pipeline
+type: docker
+name: default
+
+steps:
+- name: test
+  image: golang:1.22
+  commands:
+    - go mod tidy
+    - go test -v ./...
+
+- name: notify
+  image: plugins/slack
+  settings:
+    webhook:
+      from_secret: slack_webhook
+    channel: test
+    template: |
+      {{#success build.status}}
+        :white_check_mark: Build succeeded! (<{{build.link}}|details>)
+      {{else}}
+        :x: Build failed! (<{{build.link}}|details>)
+      {{/success}}

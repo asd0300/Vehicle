@@ -1,0 +1,37 @@
+version: '3.8'
+
+networks:
+  drone_network:
+    driver: bridge
+
+services:
+  drone-server:
+    image: drone/drone:latest
+    container_name: drone-server
+    ports:
+      - "8080:80"
+    environment:
+      - DRONE_GITHUB_CLIENT_ID
+      - DRONE_GITHUB_CLIENT_SECRET
+      - DRONE_RPC_SECRET
+      - DRONE_SERVER_HOST=drone-server:80
+      - DRONE_SERVER_PROTO=http
+    volumes:
+      - /var/lib/drone:/data
+    restart: always
+    networks:
+      - drone_network
+
+  drone-runner:
+    image: drone/drone-runner-docker:latest
+    container_name: drone-runner
+    environment:
+      - DRONE_RPC_PROTO=http
+      - DRONE_RPC_HOST=drone-server:80
+      - DRONE_RPC_SECRET
+      - DRONE_RUNNER_CAPACITY=2
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: always
+    networks:
+      - drone_network
