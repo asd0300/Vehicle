@@ -8,12 +8,12 @@ trigger:
       - feature/ci-test
 
 steps:
-- name: clone
+- name: clone2
   image: plugins/git
   settings:
     depth: 50
 
-- name: test
+- name: test2
   image: golang:1.19
   commands:
     - go version
