@@ -28,7 +28,7 @@ steps:
   image: plugins/slack
   settings:
     webhook:
-      from_secret: slack_webhook  # 从 Secrets 中引用
+      from_secret: slack_webhook
     channel: ci
     template: |
       {{#success build.status}}
