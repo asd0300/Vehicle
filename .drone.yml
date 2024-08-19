@@ -1,6 +1,6 @@
 kind: pipeline
 type: docker
-name: build-and-test
+name: build-and-test2
 
 trigger:
   branch:
