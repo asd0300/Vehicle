@@ -13,26 +13,9 @@ steps:
   settings:
     depth: 50
 
-- name: setup
-  image: golang:1.19
-  commands:
-    - go mod tidy
-    - go mod download
-
 - name: test
   image: golang:1.19
   commands:
+    - go version
+    - echo "Running simple tests"
     - go test -v ./...
-
-- name: notify
-  image: plugins/slack
-  settings:
-    webhook:
-      from_secret: slack_webhook
-    channel: ci
-    template: |
-      {{#success build.status}}
-        :white_check_mark: Build succeeded! (<{{build.link}}|details>)
-      {{else}}
-        :x: Build failed! (<{{build.link}}|details>)
-      {{/success}}
