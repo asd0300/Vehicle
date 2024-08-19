@@ -11,7 +11,7 @@ steps:
 - name: clone
   image: plugins/git
   settings:
-    depth: 50
+    depth:  50
 
 - name: setup
   image: golang:1.19
