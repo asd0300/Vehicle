@@ -13,5 +13,5 @@ func TestExample(t *testing.T) {
 }
 
 func IsGood() bool {
-	return false
+	return true
 }
