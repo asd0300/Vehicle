@@ -10,6 +10,7 @@ import (
 	"vehicle/kafkahelper"
 	router "vehicle/router"
 	service "vehicle/service"
+	websocket "vehicle/webSocket"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -61,6 +62,7 @@ func main() {
 func setupRouter() *gin.Engine {
 	app := gin.Default()
 	// app.Use(timeoutMiddleware(5 * time.Second))
+	app.GET("/ws", websocket.HandleWebSocket)
 	app.Use(corsMiddleware())
 	api := app.Group("api")
 	{
@@ -68,6 +70,7 @@ func setupRouter() *gin.Engine {
 		router.AppointmentRoute(api)
 		router.AddCapacityRoute(api)
 	}
+
 	// app.GET("swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	return app
 }
