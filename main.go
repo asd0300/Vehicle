@@ -54,8 +54,6 @@ func main() {
 
 	service.Setjwtkey(enviroment.JwtKey)
 
-	// defer client.Disconnect(context.TODO())
-
 	app := setupRouter()
 	app.Run(":4000")
 }

@@ -440,3 +440,21 @@ func SettingSaveLimits(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"status": "Limits saved successfully"})
 }
+
+func GetLimits(c *gin.Context) {
+	var limits []model.CalendarData
+
+	cursor, err := mongovehicle.CalendarCollection.Find(context.Background(), bson.M{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch limits"})
+		return
+	}
+	defer cursor.Close(context.Background())
+
+	if err = cursor.All(context.Background(), &limits); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse limits"})
+		return
+	}
+
+	c.JSON(http.StatusOK, limits)
+}

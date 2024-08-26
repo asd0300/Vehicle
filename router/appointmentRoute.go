@@ -28,7 +28,8 @@ func AppointmentRoute(r *gin.RouterGroup) {
 	calendar := r.Group("/calendar")
 	calendar.Use(middleware.AuthMiddleware())
 	calendar.GET("", service.GetAppointmentResStatus)
-	calendar.POST("save-limits", OwnerAppointmentsHandler, service.SettingSaveLimits)
+	calendar.POST("limits", OwnerAppointmentsHandler, service.SettingSaveLimits)
+	calendar.GET("limits", OwnerAppointmentsHandler, service.GetLimits)
 
 }
 
